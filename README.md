@@ -1,6 +1,8 @@
 API Documentation
 =================
 
+
+
 Gateway Microservice Public API
 -------------------------------
 
@@ -33,6 +35,7 @@ Gateway Microservice Public API
     Returns all orders pending for admin approval.
 
 
+
 Authentication Microservice Private API
 ---------------------------------------
 
@@ -44,10 +47,11 @@ Authentication Microservice Private API
     On failure, status code 400 (bad request) or 409 (duplicate) is returned.
     
     Notes:
-    - The username and password fields are required. Password is hashed before it is stored in the database.
-    - Other details (firstname, lastname, address, contact) are optional. 
+
+    - The username and password fields are required. Password is hashed before it is stored in the database.<br>
+    - Other details (firstname, lastname, address, contact) are optional.<br>
     - By default, user is non-admin. If the new user is admin, this should be specified.
-   
+
 - GET **/api/users/&lt;int:id&gt;**
 
     Returns an existing user.<br>
@@ -75,6 +79,7 @@ Authentication Microservice Private API
     On failure, status code 400 (bad request) is returned.
 
 
+
 Billing Microservice Private API
 --------------------------------
 
@@ -86,8 +91,9 @@ Billing Microservice Private API
     On failure, status code 400 (bad request) or 409 (duplicate) is returned.
     
     Notes:
-    - The service name and service url fields are required.
-    - By default, order status is not active, and pending for admin approval.
+
+    - The service name and service url fields are required.<br>
+    - By default, order status is not active, and pending for admin approval.<br>
 
 - GET **/api/users/&lt;int:user_id&gt;/orders/&lt;int:order_id&gt;**
 
@@ -114,9 +120,11 @@ Billing Microservice Private API
     On failure, status code 400 (bad request) is returned.
 
 - PUT **/api/admin/orders/&lt;int:order_id&gt;**
+
     Updates orders with pending status to approved or cancelled.<br>
     On success, standard status code 200 is returned. Body of the response contains a JSON object with the remaining pending orders and details.<br>
     On failure, status code 400 (bad request) or 404 (not found) is returned.
 
     Notes:
+
     - The order becomes active when action is approved. In opposite, it becomes inactive when cancelled.

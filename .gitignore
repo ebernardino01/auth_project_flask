@@ -111,6 +111,7 @@ env.bak/
 venv.bak/
 migrations/
 .DS_Store
+README.html
 
 # Spyder project settings
 .spyderproject
