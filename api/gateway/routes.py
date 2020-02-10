@@ -56,6 +56,8 @@ def new_user():
     password = request.json.get('password')
     firstname = request.json.get('firstname')
     lastname = request.json.get('lastname')
+    address = request.json.get('address')
+    contact = request.json.get('contact')
     is_admin = request.json.get('admin')
 
     # Submit request to auth api
@@ -72,6 +74,8 @@ def new_user():
                      'password': password,
                      'firstname': firstname,
                      'lastname': lastname,
+                     'address': address,
+                     'contact': contact,
                      'admin': is_admin})
     return (response.text, response.status_code)
 

@@ -66,6 +66,8 @@ def new_user():
     password = request.json.get('password')
     firstname = request.json.get('firstname')
     lastname = request.json.get('lastname')
+    address = request.json.get('address')
+    contact = request.json.get('contact')
     is_admin = request.json.get('admin')
 
     # Check the request arguments
@@ -77,7 +79,8 @@ def new_user():
         return duplicate('User already exists')
 
     user = User(username=username, firstname=firstname,
-                lastname=lastname, is_admin=is_admin)
+                lastname=lastname, address=address,
+                contact=contact, is_admin=is_admin)
     user.hash_password(password)
     db.session.add(user)
     db.session.commit()
