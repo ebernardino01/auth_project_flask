@@ -1,5 +1,5 @@
 import datetime
-from flask import current_app, request
+from flask import current_app, request, jsonify
 
 from api import db
 from api.billing import bp
@@ -38,7 +38,7 @@ def new_order(user_id):
                   user_id=user_id)
     db.session.add(order)
     db.session.commit()
-    return (OrderSchema().dump(order), 201)
+    return (jsonify(OrderSchema().dump(order)), 201)
 
 
 # Retrieve specific order for current user
@@ -71,7 +71,7 @@ def remove_order(user_id, order_id):
                                   ).one_or_none()
     if not order:
         return not_found('Order not found')
-    
+
     # Delete order
     db.session.delete(order)
     db.session.commit()

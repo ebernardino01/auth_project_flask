@@ -1,4 +1,4 @@
-from flask import current_app, request, g
+from flask import current_app, request, g, jsonify
 
 from api import db
 from api.auth import bp
@@ -84,15 +84,15 @@ def new_user():
     user.hash_password(password)
     db.session.add(user)
     db.session.commit()
-    return (UserSchema().dump(user), 201)
+    return (jsonify(UserSchema().dump(user)), 201)
 
 
-# Get user by id 
+# Get user by id
 @bp.route('/api/users/<int:id>')
 def get_user(id):
     user = User.query.get(id)
     return UserSchema().dump(user)
-    
+
 
 # Get all users
 @bp.route('/api/users', methods=['GET'])

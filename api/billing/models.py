@@ -15,7 +15,7 @@ approval = ['Cancelled', 'Pending', 'Approved']
 # Order model class
 class Order(db.Model):
     __tablename__ = 'orders'
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.BigInteger, primary_key=True)
     service = db.Column(db.String(255), index=True)
     status = db.Column(db.SmallInteger)
     approval_status = db.Column(db.SmallInteger)
@@ -32,6 +32,8 @@ class Order(db.Model):
 
     @property
     def approval_date_value(self):
+        if self.approval_date is None:
+            return ''
         return self.approval_date.strftime("%Y-%m-%d %H:%M:%S %z")
 
     @property

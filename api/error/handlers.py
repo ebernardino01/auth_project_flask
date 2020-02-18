@@ -1,5 +1,4 @@
 import jsonschema
-from flask import current_app
 from werkzeug.http import HTTP_STATUS_CODES
 
 from api.error import bp

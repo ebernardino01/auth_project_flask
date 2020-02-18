@@ -13,26 +13,33 @@ Gateway Microservice Public API
 - PUT **/auth**
 
     Returns an authentication token.
+    This action requires username and password.
 
 - POST **/orders/new**
 
-    Creates a new order.
+    Creates a new order.<br>
+    This action requires authentication token.
 
 - GET **/orders**
 
-    Returns all existing orders for the requesting user.
+    Returns all existing orders for the requesting user.<br>
+    This action requires authentication token.
 
 - DELETE **/orders/&lt;int:order_id&gt;**
 
-    Removes an existing order for the requesting user.
+    Removes an existing order for the requesting user.<br>
+    This action requires authentication token.
 
 - PUT **/admin/orders/&lt;int:order_id&gt;**
 
-    Updates orders with pending status to approved or cancelled.
+    Updates orders with pending status to approved or cancelled.<br>
+    This action requires authentication token and admin role.
 
 - GET **/admin/orders/**
 
-    Returns all orders pending for admin approval.
+    Returns all orders pending for admin approval.<br>
+    This action requires authentication token and admin role.
+
 
 
 
@@ -51,6 +58,7 @@ Authentication Microservice Private API
     - The username and password fields are required. Password is hashed before it is stored in the database.<br>
     - Other details (firstname, lastname, address, contact) are optional.<br>
     - By default, user is non-admin. If the new user is admin, this should be specified.
+
 
 - GET **/api/users/&lt;int:id&gt;**
 
@@ -93,7 +101,8 @@ Billing Microservice Private API
     Notes:
 
     - The service name and service url fields are required.<br>
-    - By default, order status is not active, and pending for admin approval.<br>
+    - By default, order status is not active, and pending for admin approval.
+
 
 - GET **/api/users/&lt;int:user_id&gt;/orders/&lt;int:order_id&gt;**
 
@@ -128,3 +137,4 @@ Billing Microservice Private API
     Notes:
 
     - The order becomes active when action is approved. In opposite, it becomes inactive when cancelled.
+

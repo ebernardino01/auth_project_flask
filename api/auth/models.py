@@ -13,7 +13,7 @@ from api import db
 # User model class
 class User(db.Model):
     __tablename__ = 'users'
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.BigInteger, primary_key=True)
     username = db.Column(db.String(64), index=True)
     password_hash = db.Column(db.String(128))
     firstname = db.Column(db.String(255))
@@ -43,9 +43,9 @@ class User(db.Model):
         return pwd_context.verify(password, self.password_hash)
 
     # Creates authentication token using secret key and user id
-    def generate_auth_token(self, 
+    def generate_auth_token(self,
                         expiration=current_app.config['TOKEN_TIME']):
-        s = Serializer(current_app.config['SECRET_KEY'], 
+        s = Serializer(current_app.config['SECRET_KEY'],
                        expires_in=expiration)
         return s.dumps({'id': self.id})
 
@@ -86,7 +86,7 @@ class CustomAuth(object):
             return ({'errors': [{
                      'detail': 'Invalid request details',
                      'status': '401',
-                     'title': 'Unauthorized'}]}, 
+                     'title': 'Unauthorized'}]},
                      401)
 
         self.error_handler(default_auth_error)

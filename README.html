@@ -1064,27 +1064,33 @@ body .markdown-body
 </li>
 <li>
 <p>PUT <strong>/auth</strong></p>
-<p>Returns an authentication token.</p>
+<p>Returns an authentication token.
+This action requires username and password.</p>
 </li>
 <li>
 <p>POST <strong>/orders/new</strong></p>
-<p>Creates a new order.</p>
+<p>Creates a new order.<br>
+This action requires authentication token.</p>
 </li>
 <li>
 <p>GET <strong>/orders</strong></p>
-<p>Returns all existing orders for the requesting user.</p>
+<p>Returns all existing orders for the requesting user.<br>
+This action requires authentication token.</p>
 </li>
 <li>
 <p>DELETE <strong>/orders/&lt;int:order_id&gt;</strong></p>
-<p>Removes an existing order for the requesting user.</p>
+<p>Removes an existing order for the requesting user.<br>
+This action requires authentication token.</p>
 </li>
 <li>
 <p>PUT <strong>/admin/orders/&lt;int:order_id&gt;</strong></p>
-<p>Updates orders with pending status to approved or cancelled.</p>
+<p>Updates orders with pending status to approved or cancelled.<br>
+This action requires authentication token and admin role.</p>
 </li>
 <li>
 <p>GET <strong>/admin/orders/</strong></p>
-<p>Returns all orders pending for admin approval.</p>
+<p>Returns all orders pending for admin approval.<br>
+This action requires authentication token and admin role.</p>
 </li>
 </ul>
 <h2 id="authentication-microservice-private-api">Authentication Microservice Private API<a class="headerlink" href="#authentication-microservice-private-api" title="Permanent link"></a></h2>
@@ -1140,7 +1146,7 @@ On failure, status code 400 (bad request) or 409 (duplicate) is returned.</p>
 <p>Notes:</p>
 <ul>
 <li>The service name and service url fields are required.<br></li>
-<li>By default, order status is not active, and pending for admin approval.<br></li>
+<li>By default, order status is not active, and pending for admin approval.</li>
 </ul>
 </li>
 <li>

@@ -157,7 +157,7 @@ def remove_order(order_id):
                                ':' +
                                current_app.config['API_BILL_PORT'] +
                                '/api/users/' +
-                               str(g.user['data']['id']) + 
+                               str(g.user['data']['id']) +
                                '/orders/' + str(order_id),
                headers={'Content-Type':
                         current_app.config['REST_CONTENT_TYPE'],
