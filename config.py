@@ -7,7 +7,6 @@ class Config(object):
     TOKEN_TIME = 800
 
     # sqlalchemy
-    #SQLALCHEMY_DATABASE_URI = 'postgresql:///psqlappdb'
     SQLALCHEMY_DATABASE_URI = 'postgresql+psycopg2:///psqlappdb'
     SQLALCHEMY_COMMIT_ON_TEARDOWN = True
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -24,3 +23,7 @@ class Config(object):
 
     # rest api
     REST_CONTENT_TYPE = 'application/json'
+
+    # datacenter
+    DC_SEQ_DEFAULT = 1234567
+    DC_LOCATION = 'DC0001'
