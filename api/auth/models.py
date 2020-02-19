@@ -1,6 +1,7 @@
 import datetime
 from functools import wraps
 from flask import current_app
+from sqlalchemy import Sequence, text, exc
 from marshmallow_jsonapi import fields
 from marshmallow_jsonapi.flask import Schema
 from passlib.apps import custom_app_context as pwd_context
@@ -10,10 +11,27 @@ from itsdangerous import (TimedJSONWebSignatureSerializer
 from api import db
 
 
+# Get the id sequence value to be used based from data center location
+sequence = current_app.config['DC_SEQ_DEFAULT']
+sql = text('SELECT current_id_sequence FROM location WHERE name = :param;')
+result = db.session.execute(sql,
+                            {"param": current_app.config['DC_LOCATION']})
+
+# Get ResultProxy object
+if result:
+    # Get RowProxy object
+    row = result.first()
+    if row:
+        sequence = row['current_id_sequence']
+
+
+TABLE_ID = Sequence('users_id_seq', start=sequence)
+
 # User model class
 class User(db.Model):
     __tablename__ = 'users'
-    id = db.Column(db.BigInteger, primary_key=True)
+    id = db.Column(db.BigInteger, TABLE_ID, primary_key=True,
+                   server_default=TABLE_ID.next_value())
     username = db.Column(db.String(64), index=True)
     password_hash = db.Column(db.String(128))
     firstname = db.Column(db.String(255))

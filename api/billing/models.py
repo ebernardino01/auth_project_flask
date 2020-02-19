@@ -1,4 +1,6 @@
 import datetime
+from flask import current_app
+from sqlalchemy import Sequence, text, exc
 from marshmallow_jsonapi import fields
 from marshmallow_jsonapi.flask import Schema
 
@@ -12,10 +14,27 @@ status = ['Not Active', 'Active']
 approval = ['Cancelled', 'Pending', 'Approved']
 
 
+# Get the id sequence value to be used based from data center location
+sequence = current_app.config['DC_SEQ_DEFAULT']
+sql = text('SELECT current_id_sequence FROM location WHERE name = :param;')
+result = db.session.execute(sql,
+                            {"param": current_app.config['DC_LOCATION']})
+
+# Get ResultProxy object
+if result:
+    # Get RowProxy object
+    row = result.first()
+    if row:
+        sequence = row['current_id_sequence']
+
+
+TABLE_ID = Sequence('orders_id_seq', start=sequence)
+
 # Order model class
 class Order(db.Model):
     __tablename__ = 'orders'
-    id = db.Column(db.BigInteger, primary_key=True)
+    id = db.Column(db.BigInteger, TABLE_ID, primary_key=True,
+                   server_default=TABLE_ID.next_value())
     service = db.Column(db.String(255), index=True)
     status = db.Column(db.SmallInteger)
     approval_status = db.Column(db.SmallInteger)

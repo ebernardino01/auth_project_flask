@@ -31,6 +31,4 @@ def create_app(config_class=Config):
         app.register_blueprint(gateway_bp)
 
         db.create_all()
-        #db.session.execute(open("alter.sql").read())
-        #db.session.commit()
         return app
