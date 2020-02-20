@@ -2,8 +2,8 @@ from flask import current_app, request, g, jsonify
 
 from api import db
 from api.auth import bp
-from api.auth.models import User, UserSchema, CustomPassAuth, \
-                            CustomTokenAuth
+from api.auth.models import User, CustomPassAuth, CustomTokenAuth
+from api.auth.schemas import UserSchema
 from api.error.handlers import bad_request, duplicate
 
 

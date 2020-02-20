@@ -3,7 +3,8 @@ from flask import current_app, request, jsonify
 
 from api import db
 from api.billing import bp
-from api.billing.models import Order, OrderSchema, status, approval
+from api.billing.models import Order, status, approval
+from api.billing.schemas import OrderSchema
 from api.error.handlers import bad_request, not_found, duplicate
 
 

@@ -8,6 +8,7 @@ from flask_jsonschema_validator import JSONSchemaValidator
 db = SQLAlchemy()
 migrate = Migrate()
 
+
 # application factory
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -24,11 +25,13 @@ def create_app(config_class=Config):
         from api.auth import bp as auth_bp
         from api.billing import bp as bill_bp
         from api.gateway import bp as gateway_bp
+        from api.filemgmt import bp as filemgmt_bp
 
         app.register_blueprint(error_bp)
         app.register_blueprint(auth_bp)
         app.register_blueprint(bill_bp)
         app.register_blueprint(gateway_bp)
+        app.register_blueprint(filemgmt_bp)
 
         db.create_all()
         return app

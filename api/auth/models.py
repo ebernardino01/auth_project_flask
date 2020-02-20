@@ -1,9 +1,7 @@
 import datetime
 from functools import wraps
 from flask import current_app
-from sqlalchemy import Sequence, text, exc
-from marshmallow_jsonapi import fields
-from marshmallow_jsonapi.flask import Schema
+from sqlalchemy import Sequence, text
 from passlib.apps import custom_app_context as pwd_context
 from itsdangerous import (TimedJSONWebSignatureSerializer
                           as Serializer, BadSignature, SignatureExpired)
@@ -26,6 +24,7 @@ if result:
 
 
 TABLE_ID = Sequence('users_id_seq', start=sequence)
+
 
 # User model class
 class User(db.Model):
@@ -80,21 +79,6 @@ class User(db.Model):
         user = User.query.get(data['id'])
         return user
 
-
-# User object serialization schema class
-class UserSchema(Schema):
-    id = fields.Str(dump_only=True)
-
-    class Meta:
-        type_ = "users"
-        strict = True
-        self_view = "auth.get_user"
-        self_view_kwargs = {"id": "<id>"}
-        self_view_many = "auth.get_all_user"
-
-        # Fields to expose
-        fields = ("id", "username", "fullname_value", "address",
-                  "contact", "is_admin", "created_on_value")
 
 # Custom authentication base class
 class CustomAuth(object):
