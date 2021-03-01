@@ -1,15 +1,34 @@
-from flask import current_app, request, g, jsonify
+import secrets
+from json import loads, dumps
+from sqlalchemy import func
+from flask import (
+    current_app,
+    request,
+    g,
+    url_for
+)
 
-from api import db
+from api import db, executor, redis_client
 from api.auth import bp
-from api.auth.models import User, CustomPassAuth, CustomTokenAuth
-from api.auth.schemas import UserSchema
-from api.error.handlers import bad_request, duplicate
+from api.auth.auth import pwd, tok
+from api.auth.models import (
+    User,
+    Token
+)
+from api.error.handlers import (
+    ApiException,
+    bad_request,
+    duplicate
+)
+from api.util.handlers import (
+    create_query_conditions,
+    JSONAPISerializer,
+    jsonapi_headers
+)
 
-
-# Custom authentication objects
-pwd = CustomPassAuth()
-tok = CustomTokenAuth()
+from api.billing.models import Order
+from api.filemgmt.models import File
+from api.oauth.models import OAuth2Client
 
 
 # Register a function to be run at the end of each request,
@@ -21,61 +40,120 @@ def teardown_request(exception):
     db.session.remove()
 
 
-# Callback function to validate username and password
-@pwd.verify_password
-def verify_password():
-    # Check the request arguments
-    email = request.json.get('email')
-    password = request.json.get('userPassword')
-    if email is None or password is None:
-        return False
-
-    # Validate password
-    user = User.query.filter_by(username=email).first()
-    if not user or not user.verify_password(password):
-        return False
-
-    # Make user available down the pipeline via flask.g
-    g.user = user
-    return True
+def get_user_count():
+    # print("get_user_count thread")
+    return db.session.query(func.count(User.id))
 
 
-# Callback function to validate token
-@tok.verify_token
-def verify_token():
-    # Check the request arguments
-    token = request.headers.get('Token')
-    if token is None:
-        return False
-
-    # Validate token
-    user = User.verify_auth_token(token)
-    if not user:
-        return False
-
-    # Make user available down the pipeline via flask.g
-    g.user = user
-    return True
+def get_user_detail(user_id):
+    # print("get_user_detail thread")
+    return db.session.query(User).get(user_id)
 
 
-# User registration
-@bp.route('/api/users/new', methods=['POST'])
-@current_app.validate('register', 'register')
+def get_user_order(user_id):
+    print("get_user_order thread")
+    return db.session.query(Order).filter(
+        Order.user_id == user_id).all()
+
+
+def get_user_file(user_id):
+    print("get_user_file thread")
+    return db.session.query(File).filter(
+        File.user_id == user_id).all()
+
+
+def get_user_client(user_id):
+    print("get_user_client thread")
+    return db.session.query(OAuth2Client).filter(
+        File.user_id == user_id).all()
+
+
+def get_users_from_query(query):
+    return query.all()
+
+
+def reset_redis_cache():
+    # Reset redis cache values
+    for key in redis_client.hkeys('USER_LIST_HASH'):
+        redis_client.hdel('USER_LIST_HASH', key)
+
+    for key in redis_client.hkeys('USER_ITEM_HASH'):
+        redis_client.hdel('USER_ITEM_HASH', key)
+
+
+# Initialize JSONAPI serializers for API response
+jsonapi_user = JSONAPISerializer(model=User,
+                                 fields=User.model_fields())
+
+jsonapi_token = JSONAPISerializer(model=Token,
+                                  fields=Token.model_fields())
+
+jsonapi_user_item = JSONAPISerializer(model=User,
+                                      fields=User.model_fields_items())
+
+jsonapi_order = JSONAPISerializer(model=Order,
+                                  fields=Order.model_fields())
+
+jsonapi_file = JSONAPISerializer(model=File,
+                                 fields=File.model_fields())
+
+jsonapi_client = JSONAPISerializer(model=OAuth2Client,
+                                   fields=OAuth2Client.model_fields())
+
+
+@bp.route('/users', methods=['POST'])
+@current_app.validate('user', 'user')
 def new_user():
-    username = request.json.get('username')
-    password = request.json.get('password')
-    firstname = request.json.get('firstname')
-    lastname = request.json.get('lastname')
-    address = request.json.get('address')
-    contact = request.json.get('contact')
-    is_admin = request.json.get('admin')
+    """New user registration
+
+    .. :quickref: User; Create new user
+
+    **CURL command:**
+
+    ``curl -H 'Accept: application/json' -H 'Content-Type: application/json'
+    -d '{"data": {"type": "users",
+    "attributes": {"username":"","password":"","firstname":"",
+    "lastname":"","address":"","contact":"","is_admin":""}}}'
+    -i -X POST http://127.0.0.1:5000/api/users``
+
+    :reqheader Accept: application/json
+    :reqheader Content-Type: application/json
+    :<json string username: username (REQUIRED)
+    :<json string password: plaintext password (REQUIRED)
+    :<json string firstname: firstname
+    :<json string lastname: lastname
+    :<json string address: address
+    :<json string contact: contact
+    :<json Boolean is_admin: defaults to False if not specified
+    :returns: `JSON:API <http://jsonapi.org>`_\
+    compliant created user details
+    :resheader Content-Type: application/vnd.api+json
+    :status 201: post created
+    :status 400: malformed request
+    :status 409: duplicate username
+    |
+    """
+
+    # Check the request data arguments
+    info = request.json.get('data')
+    if info is None or 'attributes' not in info:
+        return bad_request('Invalid request details')
+
+    username = info['attributes'].get('username')
+    password = info['attributes'].get('password')
+    firstname = info['attributes'].get('firstname', '')
+    lastname = info['attributes'].get('lastname', '')
+    address = info['attributes'].get('address', '')
+    contact = info['attributes'].get('contact', '')
+    is_admin = info['attributes'].get('is_admin')
+    # add_info = info['attributes'].get('info', '')
 
     # Check the request arguments
     if username is None or password is None:
         return bad_request('Missing username and/or password')
 
     # Check if existing user
-    if User.query.filter_by(username=username).first() is not None:
+    if User.query.filter(User.username == username).first() is not None:
         return duplicate('User already exists')
 
     user = User(username=username, firstname=firstname,
@@ -84,39 +162,245 @@ def new_user():
     user.hash_password(password)
     db.session.add(user)
     db.session.commit()
-    return (jsonify(UserSchema().dump(user)), 201)
+
+    reset_redis_cache()
+    return (jsonapi_user.serialize(user,
+                                   url_for('auth.new_user',
+                                           _external=True)),
+            201,
+            jsonapi_headers)
 
 
-# Get user by id
-@bp.route('/api/users/<int:id>')
-def get_user(id):
-    user = User.query.get(id)
-    return UserSchema().dump(user)
+'''
+@bp.route('/users/info/height/<int:height>', methods=['GET'])
+def get_user_height_info(height):
+    user = db.session.query(User).filter(
+        User.info.contains({"height": str(height)})
+        # User.info[('height')].astext == str(height)
+    ).all()
+
+    result = jsonapi_user.serialize(user,
+                                    url_for('auth.get_user_height_info',
+                                            _external=True,
+                                            height=height))
+    return (result, 200, jsonapi_headers)
+'''
 
 
-# Get all users
-@bp.route('/api/users', methods=['GET'])
+@bp.route('/users', methods=['GET'])
 def get_all_user():
-    users = User.query.all()
-    return UserSchema(many=True).dump(users)
+    """Get all users
+
+    .. :quickref: User; Get list of all users
+
+    **CURL command:**
+
+    ``curl -H 'Accept: application/json' -H 'Content-Type: application/json'
+    -i -X GET http://127.0.0.1:5000/api/users``
+
+    :query filter: filtering criteria e.g. ``filter[username]=user``
+    :query sort: sorting order e.g. ``sort=username,-firstname``
+    :query page: pagination details e.g. ``page[size]=2&page[number]=1``
+    :reqheader Accept: application/json
+    :reqheader Content-Type: application/json
+    :returns: `JSON:API <http://jsonapi.org>`_\
+    compliant list of all users
+    :resheader Content-Type: application/vnd.api+json
+    :status 200: OK
+    :status 400: malformed request
+    |
+    """
+
+    response = redis_client.hget('USER_LIST_HASH', 'ALL')
+    if response is not None:
+        # print("[get_all_user] decode: {}".format(response.decode()))
+        return loads(response.decode())
+
+    count_future = executor.submit(get_user_count)
+    if request.args:
+        try:
+            query = create_query_conditions(db.session.query(User),
+                                            User, request.args)
+
+            users_future = executor.submit(get_users_from_query, query)
+        except ApiException as exception:
+            return bad_request(exception.message)
+    else:
+        users_future = executor.submit(get_users_from_query,
+                                       db.session.query(User))
+
+    result = jsonapi_user.serialize(users_future.result(),
+                                    url_for('auth.get_all_user',
+                                            _external=True),
+                                    request.args,
+                                    count_future.result())
+
+    # Set redis cache value
+    if not request.args:
+        redis_client.hsetnx('USER_LIST_HASH', 'ALL', str(dumps(result)))
+    return (result, 200, jsonapi_headers)
 
 
-# Custom user authentication
-# Requires password authentication
-# Returns token when authenticated
-@bp.route('/api/auth', methods=['PUT'])
-@current_app.validate('authenticate', 'authenticate')
+@bp.route('/users/<int:id>', methods=['GET'])
+def get_user(id):
+    """Get user details by id
+
+    .. :quickref: User; Get user details
+
+    **CURL command:**
+
+    ``curl -H 'Accept: application/json' -H 'Content-Type: application/json'
+    -i -X GET http://127.0.0.1:5000/api/users/{id}``
+
+    :param id: user ID
+    :reqheader Accept: application/json
+    :reqheader Content-Type: application/json
+    :returns: `JSON:API <http://jsonapi.org>`_\
+    compliant details of user
+    :resheader Content-Type: application/vnd.api+json
+    :status 200: OK
+    |
+    """
+
+    response = redis_client.hget('USER_LIST_HASH', id)
+    # print("[get_user] redis get response: {}".format(str(response)))
+
+    if response is not None:
+        # print("[get_user] decode: {}".format(response.decode()))
+        return loads(response.decode())
+
+    user = get_user_detail(id)
+    result = jsonapi_user.serialize(user,
+                                    url_for('auth.get_user',
+                                            _external=True,
+                                            id=id))
+
+    # Set redis cache value
+    redis_client.hsetnx('USER_LIST_HASH',
+                        str(id),
+                        str(dumps(result)))
+
+    return (result, 200, jsonapi_headers)
+
+
+@bp.route('/auth', methods=['POST'])
+@current_app.validate('token', 'token')
 @pwd.login_required
-def authenticate_user():
-    # Generate token
-    token = g.user.generate_auth_token()
-    return ({'token': token.decode('ascii'),
-             'user': {'username': g.user.username}})
+def get_token():
+    """Custom user authentication
+
+    .. :quickref: Token; Generate user token
+
+    **CURL command:**
+
+    ``curl -H 'Accept: application/json' -H 'Content-Type: application/json'
+    -d '{"data": {"type": "tokens",
+    "attributes": {"email":"","userPassword":""}}}'
+    -X POST http://127.0.0.1:5000/api/auth``
+
+    :reqheader Accept: application/json
+    :reqheader Content-Type: application/json
+    :<json string email: username (REQUIRED)
+    :<json string userPassword: plaintext password (REQUIRED)
+    :returns: `JSON:API <http://jsonapi.org>`_\
+    compliant created token details
+    :resheader Content-Type: application/vnd.api+json
+    :status 201: post created
+    |
+    """
+
+    token = Token(
+        user_id=g.user.id,
+        username=g.user.username,
+        token=secrets.token_urlsafe(current_app.config['BYTE_LENGTH'])
+    )
+    db.session.add(token)
+    db.session.commit()
+    return (jsonapi_token.serialize(token,
+                                    url_for('auth.get_token',
+                                            _external=True)),
+            201,
+            jsonapi_headers)
+
+
+@bp.route('/users/<int:id>/items', methods=['GET'])
+@tok.login_required
+def get_user_items(id):
+    """User related items
+
+    .. :quickref: User; Get user related items
+
+    ``curl -H 'Accept: application/json' -H 'Content-Type: application/json'
+    -i -X GET http://127.0.0.1:5000/api/users/{id}/items``
+
+    :param id: user ID
+    :reqheader Accept: application/json
+    :reqheader Content-Type: application/json
+    :returns: `JSON:API <http://jsonapi.org>`_\
+    compliant list of items of requesting user
+    :resheader Content-Type: application/vnd.api+json
+    :status 200: OK
+    |
+    """
+
+    # user_future = executor.submit(get_user_detail, id)
+    order_future = executor.submit(get_user_order, id)
+    file_future = executor.submit(get_user_file, id)
+    client_future = executor.submit(get_user_client, id)
+
+    # user = user_future.result()
+    user = get_user_detail(id)
+    user.order = jsonapi_order.serialize(
+        order_future.result(), ''
+    )
+    user.file = jsonapi_file.serialize(
+        file_future.result(), ''
+    )
+    user.client = jsonapi_client.serialize(
+        client_future.result(), ''
+    )
+
+    result = jsonapi_user_item.serialize(user,
+                                         url_for('auth.get_user_items',
+                                                 _external=True,
+                                                 id=id))
+
+    redis_client.hsetnx('USER_ITEM_HASH',
+                        str(id),
+                        str(dumps(result)))
+
+    return (result, 200, jsonapi_headers)
+
+
+"""
+@bp.route('/users/<int:id>/items/normal', methods=['GET'])
+@tok.login_required
+def get_user_items_normal(id):
+    print("MAIN thread")
+    orders = db.session.query(Order).filter_by(user_id=id).all()
+    files = db.session.query(File).filter_by(user_id=id).all()
+    clients = db.session.query(OAuth2Client).filter_by(
+        user_id=id).all()
+
+    user = User.query.get(id)
+    user.order = orders
+    user.file = files
+    user.client = clients
+
+    return (jsonapi_user_item.serialize(user,
+                                        url_for('auth.get_user_items_normal',
+                                                _external=True,
+                                                id=id)),
+            200, jsonapi_headers)
+"""
 
 
 # Endpoint resource
-# Requires token authentication
-@bp.route('/api/resource', methods=['GET'])
+@bp.route('/resource', methods=['GET'])
 @tok.login_required
 def get_resource():
-    return UserSchema().dump(g.user)
+    return (jsonapi_user.serialize(g.user,
+                                   url_for('auth.get_resource',
+                                           _external=True)),
+            200,
+            jsonapi_headers)

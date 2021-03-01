@@ -1,5 +1,11 @@
 DROP TABLE users;
-DROP TABLE orders;
-DROP SEQUENCE users_id_seq;
-DROP SEQUENCE orders_id_seq;
+DROP TABLE tokens;
 DROP TABLE location;
+DROP TABLE oauth2_client;
+DROP TABLE oauth2_code;
+DROP TABLE oauth2_token;
+DROP SEQUENCE users_id_seq;
+DROP SEQUENCE oauth2client_id_seq;
+DROP SEQUENCE oauth2authorization_id_seq;
+DROP SEQUENCE oauth2token_id_seq;
+DELETE FROM alembic_version;
