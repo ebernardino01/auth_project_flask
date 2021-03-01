@@ -1,0 +1,11 @@
+{
+  "admin": {
+    "type": "object",
+    "properties": {
+      "action": { "type": "string",
+                  "enum": ["approved", "cancelled"]
+                }
+    },
+    "required": [ "action" ]
+  }
+}
