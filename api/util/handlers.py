@@ -1,10 +1,12 @@
+"""api/util/handlers.py"""
+
 from __future__ import division
-from six.moves.urllib.parse import urlencode
 from math import ceil
 from copy import copy
 
 import json
 import datetime
+from six.moves.urllib.parse import urlencode
 
 from flask import current_app
 from api.error.handlers import ApiException
@@ -21,8 +23,10 @@ MANAGED_KEYS = (
 )
 
 
-def split_by_separator(s):
-    return [v for v in s.split(",") if v]
+def split_by_separator(str_list):
+    """Handler for list of strings with separator"""
+
+    return [val for val in str_list.split(",") if val]
 
 
 def simple_filters(collection):
@@ -30,13 +34,6 @@ def simple_filters(collection):
 
     return [{"name": key, "op": "eq", "val": value}
             for (key, value) in collection.items()]
-
-
-def get_managed_keys(args):
-    """Get original request args containing only managed keys"""
-
-    return {key: value for (key, value) in args.items()
-            if key.startswith(MANAGED_KEYS) or get_url_key_values('filter[')}
 
 
 def get_url_key_values(name, args):
@@ -54,22 +51,30 @@ def get_url_key_values(name, args):
             item_key = key[key_start:key_end]
             item_value = value.split(',') if ',' in value else value
             results.update({item_key: item_value})
-        except Exception:
+        except KeyError:
             return None
 
     return results
 
 
-def get_operator(column, op):
+def get_managed_keys(args):
+    """Get original request args containing only managed keys"""
+
+    return {key: value for (key, value) in args.items()
+            if key.startswith(MANAGED_KEYS) or \
+                get_url_key_values('filter[', args)}
+
+
+def get_operator(column, oper):
     """Obtain sqlalchemy operator info"""
 
-    operators = (op, op + '_', '__' + op + '__')
+    operators = (oper, oper + '_', '__' + oper + '__')
     # print("operators: {}".format(str(operators)))
     for opr in operators:
         if hasattr(column, opr):
             return opr
 
-    raise Exception("{} has no operator '{}'".format(column.key, op))
+    raise Exception("{} has no operator '{}'".format(column.key, oper))
 
 
 def get_column(model, name):
@@ -93,8 +98,9 @@ def get_filters(args):
     if results:
         try:
             filters.extend(json.loads(results))
-        except (ValueError, TypeError):
-            raise ApiException("Error in parsing filter parameters")
+        except (ValueError, TypeError) as api_exc:
+            raise ApiException("Error in parsing filter parameters") \
+                from api_exc
 
     if get_url_key_values('filter[', args):
         filters.extend(simple_filters(get_url_key_values('filter[', args)))
@@ -131,8 +137,9 @@ def get_pagination(args):
                     "{} is not a valid parameter of pagination".format(key))
             try:
                 int(value)
-            except ValueError:
-                raise ApiException("Error in parsing pagination parameters")
+            except ValueError as api_exc:
+                raise ApiException("Error in parsing pagination parameters") \
+                    from api_exc
 
     return results
 
@@ -151,21 +158,21 @@ def create_query_conditions(session_query, model, args):
     # Handle filter query conditions
     filters = get_filters(args)
     if filters:
-        for filter in filters:
+        for filter_info in filters:
             try:
-                value = filter['val']
-                op = filter['op']
+                value = filter_info['val']
+                oper = filter_info['op']
                 # print("value: {}".format(str(value)))
 
                 # Get column name object from model
-                column = get_column(model, filter['name'])
+                column = get_column(model, filter_info['name'])
                 if isinstance(value, list):
                     # Change default operator to 'in' if value is list
                     operator = get_operator(column, 'in')
                 else:
-                    operator = get_operator(column, op)
+                    operator = get_operator(column, oper)
             except Exception as exception:
-                raise ApiException(str(exception))
+                raise ApiException(str(exception)) from exception
 
             # Create the sqlalchemy query conditions
             if value and column and operator:
@@ -297,8 +304,8 @@ class JSONAPISerializer(object):
         top_level = {}
         try:
             top_level['id'] = str(getattr(resource, self.primary_key))
-        except AttributeError:
-            raise
+        except AttributeError as error:
+            raise ApiException("Attribute 'id' not found") from error
 
         top_level['type'] = resource.__tablename__
         top_level['attributes'] = self.handle_attributes(resource)
@@ -319,8 +326,8 @@ class JSONAPISerializer(object):
                     attributes[mapped_fields[attribute]] = value.isoformat()
                 else:
                     attributes[mapped_fields[attribute]] = value
-            except AttributeError:
-                raise
+            except AttributeError as error:
+                raise ApiException("Attribute 'id' not found") from error
 
         return attributes
 

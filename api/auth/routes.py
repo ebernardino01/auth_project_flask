@@ -1,3 +1,5 @@
+"""api/auth/routes.py"""
+
 import secrets
 from json import loads, dumps
 from sqlalchemy import func
@@ -26,54 +28,52 @@ from api.util.handlers import (
     jsonapi_headers
 )
 
-from api.billing.models import Order
-from api.filemgmt.models import File
 from api.oauth.models import OAuth2Client
 
 
-# Register a function to be run at the end of each request,
-# regardless of whether there was an exception or not
 @bp.teardown_request
 def teardown_request(exception):
+    """Register a function to be run at the end of each request,
+    regardless of whether there was an exception or not
+
+    """
+
     if exception:
         db.session.rollback()
     db.session.remove()
 
 
 def get_user_count():
+    """Query the user count"""
+
     # print("get_user_count thread")
     return db.session.query(func.count(User.id))
 
 
 def get_user_detail(user_id):
+    """Query the user detail"""
+
     # print("get_user_detail thread")
     return db.session.query(User).get(user_id)
 
 
-def get_user_order(user_id):
-    print("get_user_order thread")
-    return db.session.query(Order).filter(
-        Order.user_id == user_id).all()
-
-
-def get_user_file(user_id):
-    print("get_user_file thread")
-    return db.session.query(File).filter(
-        File.user_id == user_id).all()
-
-
 def get_user_client(user_id):
-    print("get_user_client thread")
+    """Query the user client detail"""
+
+    # print("get_user_client thread")
     return db.session.query(OAuth2Client).filter(
-        File.user_id == user_id).all()
+        User.id == user_id).all()
 
 
 def get_users_from_query(query):
+    """Query all users"""
+
     return query.all()
 
 
 def reset_redis_cache():
-    # Reset redis cache values
+    """Reset redis cache values"""
+
     for key in redis_client.hkeys('USER_LIST_HASH'):
         redis_client.hdel('USER_LIST_HASH', key)
 
@@ -90,12 +90,6 @@ jsonapi_token = JSONAPISerializer(model=Token,
 
 jsonapi_user_item = JSONAPISerializer(model=User,
                                       fields=User.model_fields_items())
-
-jsonapi_order = JSONAPISerializer(model=Order,
-                                  fields=Order.model_fields())
-
-jsonapi_file = JSONAPISerializer(model=File,
-                                 fields=File.model_fields())
 
 jsonapi_client = JSONAPISerializer(model=OAuth2Client,
                                    fields=OAuth2Client.model_fields())
@@ -171,22 +165,6 @@ def new_user():
             jsonapi_headers)
 
 
-'''
-@bp.route('/users/info/height/<int:height>', methods=['GET'])
-def get_user_height_info(height):
-    user = db.session.query(User).filter(
-        User.info.contains({"height": str(height)})
-        # User.info[('height')].astext == str(height)
-    ).all()
-
-    result = jsonapi_user.serialize(user,
-                                    url_for('auth.get_user_height_info',
-                                            _external=True,
-                                            height=height))
-    return (result, 200, jsonapi_headers)
-'''
-
-
 @bp.route('/users', methods=['GET'])
 def get_all_user():
     """Get all users
@@ -241,8 +219,8 @@ def get_all_user():
     return (result, 200, jsonapi_headers)
 
 
-@bp.route('/users/<int:id>', methods=['GET'])
-def get_user(id):
+@bp.route('/users/<int:user_id>', methods=['GET'])
+def get_user(user_id):
     """Get user details by id
 
     .. :quickref: User; Get user details
@@ -250,7 +228,7 @@ def get_user(id):
     **CURL command:**
 
     ``curl -H 'Accept: application/json' -H 'Content-Type: application/json'
-    -i -X GET http://127.0.0.1:5000/api/users/{id}``
+    -i -X GET http://127.0.0.1:5000/api/users/{user_id}``
 
     :param id: user ID
     :reqheader Accept: application/json
@@ -262,22 +240,22 @@ def get_user(id):
     |
     """
 
-    response = redis_client.hget('USER_LIST_HASH', id)
+    response = redis_client.hget('USER_LIST_HASH', user_id)
     # print("[get_user] redis get response: {}".format(str(response)))
 
     if response is not None:
         # print("[get_user] decode: {}".format(response.decode()))
         return loads(response.decode())
 
-    user = get_user_detail(id)
+    user = get_user_detail(user_id)
     result = jsonapi_user.serialize(user,
                                     url_for('auth.get_user',
                                             _external=True,
-                                            id=id))
+                                            id=user_id))
 
     # Set redis cache value
     redis_client.hsetnx('USER_LIST_HASH',
-                        str(id),
+                        str(user_id),
                         str(dumps(result)))
 
     return (result, 200, jsonapi_headers)
@@ -323,15 +301,15 @@ def get_token():
             jsonapi_headers)
 
 
-@bp.route('/users/<int:id>/items', methods=['GET'])
+@bp.route('/users/<int:user_id>/items', methods=['GET'])
 @tok.login_required
-def get_user_items(id):
+def get_user_items(user_id):
     """User related items
 
     .. :quickref: User; Get user related items
 
     ``curl -H 'Accept: application/json' -H 'Content-Type: application/json'
-    -i -X GET http://127.0.0.1:5000/api/users/{id}/items``
+    -i -X GET http://127.0.0.1:5000/api/users/{user_id}/items``
 
     :param id: user ID
     :reqheader Accept: application/json
@@ -343,19 +321,11 @@ def get_user_items(id):
     |
     """
 
-    # user_future = executor.submit(get_user_detail, id)
-    order_future = executor.submit(get_user_order, id)
-    file_future = executor.submit(get_user_file, id)
-    client_future = executor.submit(get_user_client, id)
+    # user_future = executor.submit(get_user_detail, user_id)
+    client_future = executor.submit(get_user_client, user_id)
 
     # user = user_future.result()
-    user = get_user_detail(id)
-    user.order = jsonapi_order.serialize(
-        order_future.result(), ''
-    )
-    user.file = jsonapi_file.serialize(
-        file_future.result(), ''
-    )
+    user = get_user_detail(user_id)
     user.client = jsonapi_client.serialize(
         client_future.result(), ''
     )
@@ -363,42 +333,20 @@ def get_user_items(id):
     result = jsonapi_user_item.serialize(user,
                                          url_for('auth.get_user_items',
                                                  _external=True,
-                                                 id=id))
+                                                 id=user_id))
 
     redis_client.hsetnx('USER_ITEM_HASH',
-                        str(id),
+                        str(user_id),
                         str(dumps(result)))
 
     return (result, 200, jsonapi_headers)
 
 
-"""
-@bp.route('/users/<int:id>/items/normal', methods=['GET'])
-@tok.login_required
-def get_user_items_normal(id):
-    print("MAIN thread")
-    orders = db.session.query(Order).filter_by(user_id=id).all()
-    files = db.session.query(File).filter_by(user_id=id).all()
-    clients = db.session.query(OAuth2Client).filter_by(
-        user_id=id).all()
-
-    user = User.query.get(id)
-    user.order = orders
-    user.file = files
-    user.client = clients
-
-    return (jsonapi_user_item.serialize(user,
-                                        url_for('auth.get_user_items_normal',
-                                                _external=True,
-                                                id=id)),
-            200, jsonapi_headers)
-"""
-
-
-# Endpoint resource
 @bp.route('/resource', methods=['GET'])
 @tok.login_required
 def get_resource():
+    """Endpoint resource"""
+
     return (jsonapi_user.serialize(g.user,
                                    url_for('auth.get_resource',
                                            _external=True)),

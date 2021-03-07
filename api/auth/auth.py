@@ -1,3 +1,5 @@
+"""api/auth/auth.py"""
+
 from functools import wraps
 from flask import request, g
 
@@ -19,20 +21,20 @@ class CustomAuth(object):
 
         self.error_handler(default_auth_error)
 
-    def error_handler(self, f):
+    def error_handler(self, func):
         """Error handling callback"""
-        self.auth_error_callback = f
-        return f
+        self.auth_error_callback = func
+        return func
 
-    def login_required(self, f):
+    def login_required(self, func):
         """Decorator function to check authentication"""
-        @wraps(f)
+        @wraps(func)
         def wrap(*args, **kwargs):
             if not self.authenticate():
                 return self.auth_error_callback()
 
-            # finally call f. f() now have access to g.user
-            return f(*args, **kwargs)
+            # finally call func() now have access to g.user
+            return func(*args, **kwargs)
         return wrap
 
 
@@ -43,10 +45,10 @@ class CustomPassAuth(CustomAuth):
         super(CustomPassAuth, self).__init__()
         self.verify_password_callback = None
 
-    def verify_password(self, f):
+    def verify_password(self, func):
         """Verify password callback"""
-        self.verify_password_callback = f
-        return f
+        self.verify_password_callback = func
+        return func
 
     def authenticate(self):
         """Returns callback function for
@@ -64,10 +66,10 @@ class CustomTokenAuth(CustomAuth):
         super(CustomTokenAuth, self).__init__()
         self.verify_token_callback = None
 
-    def verify_token(self, f):
+    def verify_token(self, func):
         """Verify token callback"""
-        self.verify_token_callback = f
-        return f
+        self.verify_token_callback = func
+        return func
 
     def authenticate(self):
         """Returns callback function for
@@ -118,18 +120,18 @@ def verify_token():
     """
 
     # Check the request header
-    tokenRequest = request.headers.get('Token')
-    if tokenRequest is None:
+    token_request = request.headers.get('Token')
+    if token_request is None:
         return False
 
     # Validate token
-    userToken = Token.query.filter(
-        Token.token == tokenRequest).one_or_none()
-    if not userToken:
+    user_token = Token.query.filter(
+        Token.token == token_request).one_or_none()
+    if not user_token:
         return False
 
     # Make user available down the pipeline via flask.g
-    g.user = User.query.get(userToken.user_id)
+    g.user = User.query.get(user_token.user_id)
     if not g.user:
         return False
 

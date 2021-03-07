@@ -1,3 +1,5 @@
+"""api/oauth/oauth2.py"""
+
 from flask import (
     request,
     url_for
@@ -45,11 +47,11 @@ jsonapi_code = JSONAPISerializer(model=OAuth2AuthorizationCode,
                                  fields=OAuth2AuthorizationCode.model_fields())
 
 
-def create_oauth2_response(type):
+def create_oauth2_response(oauth_type):
     """Generate OAuth response details
 
-    :param string type: 'token_detail', 'token_revoke' or \
-    'authorization_code'
+    :param string oauth_type: 'token_detail', 'token_revoke' \
+    or 'authorization_code'
     """
 
     # print("[POST] request: {}".format(str(request)))
@@ -68,18 +70,18 @@ def create_oauth2_response(type):
                                   request.headers)
 
     # Obtain and validate grant from request
-    if type != 'token_revoke':
+    if oauth_type != 'token_revoke':
         try:
-            if type == 'token_detail':
+            if oauth_type == 'token_detail':
                 grant = authorization.get_token_grant(oauth2request)
-            elif type == 'authorization_code':
+            elif oauth_type == 'authorization_code':
                 grant = authorization.get_authorization_grant(oauth2request)
         except InvalidGrantError as error:
             return authorization.handle_error_response(oauth2request, error)
 
     # Validate request and return JSONAPI token response
     try:
-        if type == 'token_detail':
+        if oauth_type == 'token_detail':
             grant.validate_token_request(request_body)
             response_args = grant.create_token_response()
             # print("[POST] response_args: {}".format(str(response_args)))
@@ -93,7 +95,7 @@ def create_oauth2_response(type):
             ]
 
             status_code = 201
-        elif type == 'token_revoke':
+        elif oauth_type == 'token_revoke':
             endpoint = authorization.get_endpoint('revocation')
             result = jsonapi_token.serialize(endpoint(oauth2request),
                                              url_for('oauth.revoke_token'))
@@ -104,7 +106,7 @@ def create_oauth2_response(type):
             ]
 
             status_code = 200
-        elif type == 'authorization_code':
+        elif oauth_type == 'authorization_code':
             username = request_body.get('username')
             grant_user = User.query.filter_by(username=username).first()
             redirect_uri = grant.validate_authorization_request()
@@ -148,8 +150,8 @@ def authenticate_oauth2_client(client_id, client_secret, grant):
         raise ApiException('Client not found',
                            status_code=404)
 
-    AUTH_METHODS = ['client_secret_basic', 'none']
-    if client.token_endpoint_auth_method in AUTH_METHODS and not \
+    auth_methods = ['client_secret_basic', 'none']
+    if client.token_endpoint_auth_method in auth_methods and not \
        client.check_client_secret(client_secret):
         raise ApiException('Client authentication failed',
                            status_code=401)
@@ -170,30 +172,6 @@ def authenticate_oauth2_client(client_id, client_secret, grant):
 
 class AuthorizationCodeGrant(grants.AuthorizationCodeGrant):
     """AuthorizationCodeGrant class extension from authlib"""
-
-    '''
-    def create_authorization_code(self, client, grant_user, request):
-        # code = gen_salt(48)
-        code = secrets.token_urlsafe(
-            current_app.config['BYTE_LENGTH_SECRET'])
-        item = OAuth2AuthorizationCode(
-            code=code,
-            client_id=client.client_id,
-            redirect_uri=request.redirect_uri,
-            response_type=request.response_type,
-            scope=request.scope,
-            user_id=grant_user.id,
-        )
-        db.session.add(item)
-        db.session.commit()
-        return code
-
-    def parse_authorization_code(self, code, client):
-        item = OAuth2AuthorizationCode.query.filter_by(
-            code=code, client_id=client.client_id).first()
-        if item and not item.is_expired():
-            return item
-    '''
 
     def save_authorization_code(self, code, request):
         if OAuth2AuthorizationCode.query.filter_by(
@@ -227,6 +205,7 @@ class AuthorizationCodeGrant(grants.AuthorizationCodeGrant):
             code=code, client_id=client.client_id).first()
         if auth_code and not auth_code.is_expired():
             return auth_code
+        return None
 
     def delete_authorization_code(self, authorization_code):
         db.session.delete(authorization_code)
@@ -235,19 +214,18 @@ class AuthorizationCodeGrant(grants.AuthorizationCodeGrant):
     def authenticate_user(self, authorization_code):
         return User.query.get(authorization_code.user_id)
 
-    def validate_token_request(self, request_body):
+    # def validate_token_request(self, request):
+    def validate_token_request(self):
         client = authenticate_oauth2_client(
             self.request.client_id,
             self.request.body.get('client_secret'),
             self
         )
 
-        '''
         # Send authenticate client signal to framework
         # print("[AuthorizationCodeGrant] client: {}".format(str(client)))
-        self.server.send_signal('after_authenticate_client',
-                                client=client, grant=self)
-        '''
+        # self.server.send_signal('after_authenticate_client',
+        #                         client=client, grant=self)
 
         # print("[AuthorizationCodeGrant] client: {}".format(str(client)))
         code = self.request.body.get('code')
@@ -268,18 +246,8 @@ class AuthorizationCodeGrant(grants.AuthorizationCodeGrant):
             raise ApiException('Invalid code in request',
                                status_code=400)
 
-        # Validate code challenge
         # print("[AuthorizationCodeGrant] code challenge: {}".format(
         #     str(authorization_code.code_challenge)))
-        '''
-        code_challenge = code_verifier \
-            if code_challenge_method is not 'S256' \
-            else create_s256_code_challenge(code_verifier)
-
-        if code_challenge == authorization_code.code_challenge:
-            raise ApiException('Mismatch code_verifier in request',
-                               status_code=400)
-        '''
 
         # Validate redirect_uri parameter
         redirect_uri = self.request.redirect_uri
@@ -301,23 +269,11 @@ class PasswordGrant(grants.ResourceOwnerPasswordCredentialsGrant):
         if user is not None and user.verify_password(password):
             return user
 
-    def validate_token_request(self, request_body):
+    def validate_token_request(self):
         # print("[PasswordGrant] request: {}".format(str(self.request)))
         client = authenticate_oauth2_client(self.request.client_id,
                                             self.request.body['client_secret'],
                                             self)
-
-        '''
-        # Send authenticate client signal to framework
-        # print("[PasswordGrant] client: {}".format(str(client)))
-        self.server.send_signal('after_authenticate_client',
-                                client=client, grant=self)
-
-        # Validate client grant type
-        if not client.check_grant_type(self.GRANT_TYPE):
-            raise ApiException('Client is not authorized',
-                               status_code=401)
-        '''
 
         # Validate user credentials
         # print("[PasswordGrant] client: {}".format(str(client)))
@@ -335,22 +291,10 @@ class PasswordGrant(grants.ResourceOwnerPasswordCredentialsGrant):
 class ClientCredentialsGrant(grants.ClientCredentialsGrant):
     """ClientCredentialsGrant class extension from authlib"""
 
-    def validate_token_request(self, request_body):
+    def validate_token_request(self):
         client = authenticate_oauth2_client(self.request.client_id,
                                             self.request.body['client_secret'],
                                             self)
-
-        '''
-        # Send authenticate client signal to framework
-        # print("[ClientCredentialsGrant] client: {}".format(str(client)))
-        self.server.send_signal('after_authenticate_client',
-                                client=client, grant=self)
-
-        # Validate client grant type
-        if not client.check_grant_type(self.GRANT_TYPE):
-            raise ApiException('Client is not authorized',
-                               status_code=401)
-        '''
 
         # print("[ClientCredentialsGrant] client: {}".format(str(client)))
         self.request.client = client
@@ -363,13 +307,6 @@ class ImplicitGrant(grants.ImplicitGrant):
     def validate_authorization_request(self):
         # print("[ImplicitGrant] client: {}".format(self.request))
         client = authenticate_oauth2_client(self.request.client_id, '', self)
-
-        '''
-        # Send authenticate client signal to framework
-        # print("[ImplicitGrant] client: {}".format(str(client)))
-        self.server.send_signal('after_authenticate_client',
-                                client=client, grant=self)
-        '''
 
         # Validate redirect uri
         # print("[ImplicitGrant] client: {}".format(str(client)))
@@ -413,22 +350,10 @@ class RefreshTokenGrant(grants.RefreshTokenGrant):
         db.session.add(credential)
         db.session.commit()
 
-    def validate_token_request(self, request_body):
+    def validate_token_request(self):
         client = authenticate_oauth2_client(self.request.client_id,
                                             self.request.body['client_secret'],
                                             self)
-
-        '''
-        # Send authenticate client signal to framework
-        # print("[RefreshTokenGrant] client: {}".format(str(client)))
-        self.server.send_signal('after_authenticate_client',
-                                client=client, grant=self)
-
-        # Validate client grant type
-        if not client.check_grant_type(self.GRANT_TYPE):
-            raise ApiException('Client is not authorized',
-                               status_code=401)
-        '''
 
         # Validate refresh token
         # print("[RefreshTokenGrant] client: {}".format(str(client)))
@@ -448,12 +373,22 @@ class RefreshTokenGrant(grants.RefreshTokenGrant):
 
 
 class OAuth2AuthorizationServer(AuthorizationServer):
+    """Custom implementation of authorization server
+    class defined in authlib to fit with JSONAPI
+    """
+
     def get_endpoint(self, name):
+        """Get specified endpoint from endpoints member
+        data of AuthorizationServer
+
+        returns: dict
+        """
+
         return self._endpoints[name]
 
 
 class OAuth2RevocationEndpoint(TokenEndpoint):
-    """Custom implementation of revocation endpoint class
+    """Custom implementation of RevocationEndpoint class
     defined in authlib to fit with JSONAPI
     """
 
@@ -496,10 +431,23 @@ class OAuth2RevocationEndpoint(TokenEndpoint):
         )
         return credential
 
+    def query_token(self, token, token_type_hint, client):
+        """Get the token by the given token string"""
+
+        raise NotImplementedError()
+
+    def revoke_token(self, token):
+        """Mark token as revoked"""
+
+        raise NotImplementedError()
+
 
 def create_oauth2_revocation_endpoint(session, token_model):
-    """Customized implementation of create revocation endpoint class
-    defined in authlib to fit with flask-rest-jsonapi
+    """Customized implementation of create_revocation_endpoint
+    method defined in authlib to fit with flask-rest-jsonapi
+
+    :param session: SQLAlchemy session
+    :param token_model: Token model class
     """
 
     query_token = create_query_token_func(session, token_model)

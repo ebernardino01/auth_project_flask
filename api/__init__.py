@@ -1,9 +1,12 @@
-from flask import Flask
-from config import Config
+"""api/__init.py__"""
+
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_jsonschema_validator import JSONSchemaValidator
+from flask_executor import Executor
 from flask_redis import FlaskRedis
+from flask import Flask
+from config import Config
 
 
 # Sqlalchemy ORM object
@@ -11,6 +14,9 @@ db = SQLAlchemy()
 
 # Migrate object
 migrate = Migrate()
+
+# Flask executor object
+executor = Executor()
 
 # Redis object
 redis_client = FlaskRedis()
@@ -48,6 +54,7 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
     JSONSchemaValidator(app, app.config['JSONSCHEMA_ROOT'])
+    executor.init_app(app)
     redis_client.init_app(app)
 
     with app.app_context():

@@ -1,3 +1,5 @@
+"""api/oauth/routes.py"""
+
 import time
 import secrets
 from json import loads, dumps
@@ -29,22 +31,29 @@ from api.util.handlers import (
 
 
 def get_client_count():
+    """Query the oauth client count"""
+
     # print("get_client_count thread")
     return db.session.query(func.count(OAuth2Client.id))
 
 
 def get_client_count_by_id(user_id):
+    """Query the oauth client count by user ID"""
+
     # print("get_client_count_by_id thread")
     return db.session.query(func.count(OAuth2Client.id)).filter(
         OAuth2Client.user_id == user_id)
 
 
 def get_clients_from_query(query):
+    """Get all clients"""
+
     return query.all()
 
 
 def reset_redis_cache():
-    # Reset redis cache values
+    """Reset redis cache values"""
+
     for key in redis_client.hkeys('OAUTH2_CLIENT_LIST_HASH'):
         redis_client.hdel('OAUTH2_CLIENT_LIST_HASH', key)
 
@@ -254,9 +263,9 @@ def get_client_list(user_id):
     return (result, 200, jsonapi_headers)
 
 
-@bp.route('/oauth/users/<int:user_id>/clients/<int:id>',
+@bp.route('/oauth/users/<int:user_id>/clients/<int:client_id>',
           methods=['GET'])
-def get_client(user_id, id):
+def get_client(user_id, client_id):
     """Get oauth client detail
 
     .. :quickref: OAuth; Get oauth client detail
@@ -267,7 +276,7 @@ def get_client(user_id, id):
     -i -X GET http://127.0.0.1:5000/api/oauth/users/{user_id}/clients/{id}``
 
     :param user_id: user ID of resource owner
-    :param id: client ID
+    :param client_id: client ID
     :reqheader Accept: application/json
     :reqheader Content-Type: application/json
     :returns: `JSON:API <http://jsonapi.org>`_\
@@ -277,31 +286,31 @@ def get_client(user_id, id):
     |
     """
 
-    response = redis_client.hget('OAUTH2_CLIENT_DETAIL_HASH', id)
+    response = redis_client.hget('OAUTH2_CLIENT_DETAIL_HASH', client_id)
     if response is not None:
         # print("[get_client] decode: {}".format(response.decode()))
         return loads(response.decode())
 
     client = OAuth2Client.query.filter(
-        OAuth2Client.id == id,
+        OAuth2Client.id == client_id,
         OAuth2Client.user_id == user_id).one_or_none()
 
     result = jsonapi_client.serialize(client,
                                       url_for('oauth.get_client',
                                               _external=True,
-                                              id=id,
+                                              id=client_id,
                                               user_id=user_id))
 
     redis_client.hsetnx('OAUTH2_CLIENT_DETAIL_HASH',
-                        str(id),
+                        str(client_id),
                         str(dumps(result)))
 
     return (result, 200, jsonapi_headers)
 
 
-@bp.route('/oauth/users/<int:user_id>/clients/<int:id>',
+@bp.route('/oauth/users/<int:user_id>/clients/<int:client_id>',
           methods=['DELETE'])
-def remove_client(user_id, id):
+def remove_client(user_id, client_id):
     """Delete oauth client by id
 
     .. :quickref: OAuth; Delete oauth client
@@ -312,7 +321,7 @@ def remove_client(user_id, id):
     -i -X DELETE http://127.0.0.1:5000/api/oauth/users/{user_id}/clients/{id}``
 
     :param user_id: user ID of resource owner
-    :param id: client ID
+    :param client_id: client ID
     :reqheader Accept: application/json
     :reqheader Content-Type: application/json
     :returns: `JSON:API <http://jsonapi.org>`_\
@@ -325,7 +334,7 @@ def remove_client(user_id, id):
 
     # Filter by client id, user id
     client = OAuth2Client.query.filter(
-        OAuth2Client.id == id,
+        OAuth2Client.id == client_id,
         OAuth2Client.user_id == user_id).one_or_none()
 
     if not client:

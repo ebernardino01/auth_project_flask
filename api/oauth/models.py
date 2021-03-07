@@ -1,3 +1,5 @@
+"""api/oauth/models.py"""
+
 import time
 from flask import current_app
 from sqlalchemy import Sequence, text
@@ -39,12 +41,22 @@ class OAuth2Client(db.Model, OAuth2ClientMixin):
 
     @property
     def client_id_issued_datetime(self):
+        """Get client id issue date in custom format
+
+        :returns: String
+        """
+
         return time.strftime("%Y-%m-%d %H:%M:%S %z",
                              time.localtime(self.client_id_issued_at))
 
     @staticmethod
     def model_fields():
-        """List of OAuth2Client object fields to be shown in response"""
+        """List of OAuth2Client object fields to be shown
+        in response
+
+        :returns: List
+        """
+
         return ['id', 'client_id', 'client_secret',
                 'client_metadata', 'user_id']
 
@@ -61,7 +73,10 @@ class OAuth2AuthorizationCode(db.Model, OAuth2AuthorizationCodeMixin):
     def model_fields():
         """List of OAuth2AuthorizationCode object fields
         to be shown in response
+
+        :returns: List
         """
+
         return ['id', 'code', 'client_id', 'redirect_uri',
                 'response_type', 'scope', 'user_id']
 
@@ -76,16 +91,31 @@ class OAuth2Token(db.Model, OAuth2TokenMixin):
 
     @staticmethod
     def model_fields():
-        """List of OAuth2Token object fields to be shown in response"""
+        """List of OAuth2Token object fields to be shown
+        in response
+
+        :returns: List
+        """
+
         return ['id', 'client_id', 'token_type', 'access_token',
                 'refresh_token', 'scope', 'revoked', 'user_id']
 
     @property
     def issued_datetime(self):
+        """Get token issue date in custom format
+
+        :returns: String
+        """
+
         return time.strftime("%Y-%m-%d %H:%M:%S %z",
                              time.localtime(self.issued_at))
 
     def is_refresh_token_active(self):
+        """Check refresh token status
+
+        :returns: Boolean
+        """
+
         if self.revoked:
             return False
         expires_at = self.issued_at + self.expires_in * 2

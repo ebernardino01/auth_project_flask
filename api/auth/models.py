@@ -1,8 +1,10 @@
+"""api/auth/models.py"""
+
 import datetime
 import secrets
 from flask import current_app
 from sqlalchemy import Sequence, text
-from sqlalchemy.dialects.postgresql.json import JSONB
+# from sqlalchemy.dialects.postgresql.json import JSONB
 from passlib.apps import custom_app_context as pwd_context
 
 from api import db
@@ -41,20 +43,32 @@ class User(db.Model):
     created_on = db.Column(db.DateTime(timezone=True),
                            default=datetime.datetime.now)
     # info = db.Column(JSONB)
-
-    order = None
-    file = None
     client = None
 
     def get_user_id(self):
+        """Get user id value
+
+        :returns: BigInteger
+        """
+
         return self.id
 
     @property
     def fullname_value(self):
+        """Get user full name
+
+        :returns: String
+        """
+
         return ' '.join([x for x in (self.firstname, self.lastname) if x])
 
     @property
     def created_on_value(self):
+        """Get user creation date in custom format
+
+        :returns: String
+        """
+
         return self.created_on.strftime("%Y-%m-%d %H:%M:%S %z")
 
     def hash_password(self, password):
@@ -62,6 +76,7 @@ class User(db.Model):
 
         :param password: password string
         """
+
         self.password_hash = pwd_context.encrypt(password)
 
     def verify_password(self, password):
@@ -70,23 +85,28 @@ class User(db.Model):
         :param password: password string
         :returns: Boolean
         """
+
         return pwd_context.verify(password, self.password_hash)
 
     @staticmethod
-    def generate_hash(value):
-        return pwd_context.encrypt(value)
-
-    @staticmethod
     def model_fields():
-        """List of User object fields to be shown in response"""
+        """User object fields to be shown in response
+
+        :returns: List
+        """
+
         return ['id', 'username', 'firstname', 'lastname',
-                'address', 'contact', 'is_admin', 'info']
+                'address', 'contact', 'is_admin']
 
     @staticmethod
     def model_fields_items():
+        """User object item fields to be shown in response
+
+        :returns: List
+        """
+
         return ['id', 'username', 'firstname', 'lastname',
-                'address', 'contact', 'is_admin',
-                'order', 'file', 'client']
+                'address', 'contact', 'is_admin', 'client']
 
 
 class Token(db.Model):
@@ -102,14 +122,29 @@ class Token(db.Model):
 
     @property
     def username(self):
+        """Get user name info
+
+        :returns: String
+        """
+
         return self._username
 
     @username.setter
     def username(self, value):
+        """Set user name info
+
+        :param value: username
+        """
+
         self._username = value
 
     @property
     def requested_on_datetime(self):
+        """Get token request date in custom format
+
+        :returns: String
+        """
+
         return self.requested_on.strftime("%Y-%m-%d %H:%M:%S %z")
 
     @staticmethod
@@ -119,12 +154,17 @@ class Token(db.Model):
         :param user_id: user ID
         :returns: Token
         """
-        userToken = Token.query.filter_by(user_id=user_id).one_or_none()
-        if userToken:
+
+        user_token = Token.query.filter_by(user_id=user_id).one_or_none()
+        if user_token:
             return None
         return secrets.token_urlsafe(current_app.config['BYTE_LENGTH'])
 
     @staticmethod
     def model_fields():
-        """List of Token object fields to be shown in response"""
+        """List of Token object fields to be shown in response
+
+        :returns: List
+        """
+
         return ['id', 'user_id', 'token']
